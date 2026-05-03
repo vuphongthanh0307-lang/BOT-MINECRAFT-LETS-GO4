@@ -27,7 +27,7 @@ function createBot() {
     const bot = mineflayer.createBot({
         host: 'aemine.vn',
         port: 25565,
-        username: 'winlxag5555', 
+        username: 'winlxag5554', 
         version: '1.12.2',
         viewDistance: 'tiny', 
         checkTimeoutInterval: 90000,
