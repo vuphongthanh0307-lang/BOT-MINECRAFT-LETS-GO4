@@ -21,7 +21,7 @@ console.error = function(...args) {
     originalError.apply(console, args);
 };
 
-const RECONNECT_DELAY = 30000; 
+const RECONNECT_DELAY = 300000; 
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -108,10 +108,12 @@ function createBot() {
             }
         }
 
-        // 2. BẢO TRÌ/KICK -> NẰM CHỜ
+        // ==========================================
+        // 2. BẢO TRÌ/KICK -> ÉP VỀ HUB VÀ TỰ BẤM LA BÀN
+        // ==========================================
         if (lowerMsg.includes('kicked from') || lowerMsg.includes('bảo trì') || lowerMsg.includes('đã đóng')) {
-            console.log('[Hệ Thống] Phát hiện Bảo Trì/Kick! Đang nằm chờ server tự kéo...');
-            botState = 'MAINTENANCE'; 
+            console.log('[Hệ Thống] Bị ném ra Sảnh (Bảo trì/Kick)! Chuyển sang chế độ TỰ ĐỤC LỖ vô lại...');
+            botState = 'IN_HUB'; // Đổi thành IN_HUB để bot tự lôi la bàn ra bấm
             isComboRunning = false; 
         }
 
@@ -127,37 +129,37 @@ function createBot() {
             setTimeout(() => { if (botState === 'FARMING') bot.chat('/sit'); }, 3000);
         }
 
-        // KHÓA HUB: CHỈ MÚA KHI THẤY THÔNG BÁO VÀO CỤM
-        if (lowerMsg.includes('vừa tham gia máy chủ') && lowerMsg.includes(bot.username.toLowerCase())) {
-            if (botState !== 'FARMING') {
-                console.log(`[Mắt Thần] Thấy thông báo: ${message}`);
-                console.log('[Mắt Thần] ĐÃ LỌT VÀO CỤM FARM AN TOÀN! Khóa Hub, Bắt đầu múa!');
-                botState = 'FARMING';
-                isComboRunning = false; 
-                startFarmingProcess(bot);
-            }
+        // ==============================================================
+        // KHÓA HUB: MỞ RỘNG MẮT THẦN ĐỂ TỰ MÚA KHI VÔ GAME
+        // ==============================================================
+        const hasJoinMessage = lowerMsg.includes('vừa tham gia máy chủ') && lowerMsg.includes(bot.username.toLowerCase());
+        const hasGameMessage = lowerMsg.includes('boss') || lowerMsg.includes('tài xỉu') || lowerMsg.includes('nô lệ') || lowerMsg.includes('thế giới') || lowerMsg.includes('thủ lĩnh');
+        
+        if (botState !== 'FARMING' && (hasJoinMessage || hasGameMessage)) {
+            console.log(`[Mắt Thần] Thấy thông báo vô game! ĐÃ LỌT VÀO CỤM FARM AN TOÀN! Khóa Hub, Bắt đầu múa!`);
+            botState = 'FARMING';
+            isComboRunning = false; 
+            startFarmingProcess(bot);
         }
     });
 
     // ==========================================
-    // MẮT THẦN ĐỌC TÚI ĐỒ (ĐÃ KHÓA CỨNG KHI FARM)
+    // LA BÀN TỰ ĐỘNG: CỨ Ở HUB LÀ TỰ BẤM
     // ==========================================
     setInterval(() => {
         if (!currentBot || !currentBot.inventory) return;
         
-        // CHỐT CHẶN BẤT TỬ
-        if (botState === 'FARMING') return; 
+        // CHỈ DỪNG BẤM LA BÀN NẾU ĐANG FARM HOẶC ĐANG BỊ SONAR SOI
+        if (botState === 'FARMING' || botState === 'WAIT_AUTO') return; 
 
         const items = currentBot.inventory.items();
         const hasCompass = items.some(i => i.name === 'compass');
 
         if (hasCompass) {
-            if (botState === 'FIRST_LOGIN') {
-                botState = 'IN_HUB'; 
-            }
-
-            if (botState === 'IN_HUB' && !isGUIOpen) {
-                console.log('[Hub] Từ ngoài vào Sảnh! Cầm la bàn đục lỗ...');
+            botState = 'IN_HUB'; // Luôn gán là đang ở Hub để tự bấm
+            
+            if (!isGUIOpen) {
+                console.log('[Hub] Thấy La Bàn Sảnh! Tiến hành click Menu (Tự túc)...');
                 currentBot.setQuickBarSlot(4);
                 currentBot.activateItem();
             }
@@ -165,7 +167,7 @@ function createBot() {
     }, 3000); 
 
     bot.on('windowOpen', async (window) => {
-        if (isGUIOpen || botState === 'MAINTENANCE') return; 
+        if (isGUIOpen || botState === 'WAIT_AUTO') return; 
         isGUIOpen = true; 
         try {
             console.log('[Menu] Đang mở GUI...');
@@ -173,7 +175,7 @@ function createBot() {
             await bot.clickWindow(20, 0, 0); 
             await sleep(2000);
             await bot.clickWindow(14, 0, 0); 
-            console.log('[Menu] Đã click xong! Chờ server load map...');
+            console.log('[Menu] Đã click xong! Chờ server bế vào cụm...');
         } catch (err) {
             console.log('Lỗi click GUI:', err.message);
         } finally {
@@ -191,7 +193,7 @@ function createBot() {
         
         if (reasonStr.toLowerCase().includes('xác minh') || reasonStr.toLowerCase().includes('thành công') || reasonStr.toLowerCase().includes('vượt qua')) {
             console.log('>>> [Anti-Bot] Đã đọc được bảng "XÁC MINH THÀNH CÔNG" từ server!');
-            isSonarKick = true; 
+            isSonarKick = true; // Khóa cờ xác nhận 100%
         } else {
             console.log(`[BỊ KICK] Lý do khác: ${reasonStr}`);
         }
@@ -240,7 +242,7 @@ function createBot() {
         if (failCount >= 5) {
             console.log(`[BÁO ĐỘNG] Rớt mạng ${failCount} lần! Ngủ đông 1 tiếng tránh bị Ban...`);
             failCount = 0; 
-            setTimeout(createBot, 3600000); 
+            setTimeout(createBot, 40000); 
             return;
         }
         console.log(`[Mất mạng] Lần rớt thứ ${failCount}. Đợi ${RECONNECT_DELAY/1000} giây để vào lại...`);
