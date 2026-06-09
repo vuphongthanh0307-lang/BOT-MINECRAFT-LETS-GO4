@@ -291,7 +291,7 @@ async function startFarmingProcess(bot) {
         await sleep(6000); // Chờ 6 giây cho chắc ăn load xong map
         
         // 6. NGỒI THIỀN
-        bot.chat('/lay');
+        bot.chat('/sit');
         console.log('[Farm] Đã đến bãi, nằm xuống nhập định!');
         
         failCount = 0; 
