@@ -23,7 +23,7 @@ console.error = function(...args) {
 
 const RECONNECT_DELAY = 300000; 
 
-const app = report || express();
+const app = express(); // <--- ĐÃ FIX SẠCH SẼ CHỖ NÀY CHO BRO!
 const port = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot Fonggggg đang Farm VIP Pro!'));
 app.listen(port, () => console.log(`[Web] Server đang chạy trên port ${port}`));
@@ -41,7 +41,7 @@ let isComboRunning = false;
 let isGUIOpen = false; 
 let failCount = 0;
 let isSonarKick = false; 
-let sonarInterval = null; // VŨ KHÍ BÍ MẬT: LUỒNG GÓI TIN GIẢ LẬP
+let sonarInterval = null; 
 
 function createBot() {
     const bot = mineflayer.createBot({
@@ -56,7 +56,6 @@ function createBot() {
 
     currentBot = bot; 
 
-    // BẮT GÓI TIN DISCONNECT SỚM TỪ SERVER NẾU BỊ KICK TRƯỚC KHI SPAWN
     bot.once('login', () => {
         bot._client.on('disconnect', (packet) => {
             try {
@@ -102,9 +101,9 @@ function createBot() {
             setTimeout(() => bot.chat('/dn Windvu@2#1#9#30849009630'), 1500); 
         }
 
-        // ======================================================================
-        // BƯỚC 1: NHẬN DIỆN SONAR & BẮT ĐẦU SPAM LUỒNG PACKET GIẢ LẬP VANILLA (20Hz)
-        // ======================================================================
+        // ==========================================
+        // BƯỚC 1: NHẬN DIỆN SONAR ĐANG QUÉT
+        // ==========================================
         if (lowerMsg.includes('sonar') && lowerMsg.includes('xác minh')) {
             console.log('>>> [Anti-Bot] Bị Sonar soi! Kích hoạt chế độ giả lập gói tin người thật (20Hz)...');
             bot.clearControlStates();
@@ -113,15 +112,12 @@ function createBot() {
 
             if (sonarInterval) clearInterval(sonarInterval);
 
-            // Chạy vòng lặp duy trì 50ms một gói tin (bằng tần số Game gốc)
             sonarInterval = setInterval(() => {
                 if (botState === 'WAIT_AUTO' && bot._client && bot.entity && bot.entity.position) {
                     try {
-                        // Giả lập người thật: Chuột nhúc nhích rung lắc siêu nhỏ (Micro-jitter)
                         const jitterYaw = bot.entity.yaw + (Math.random() - 0.5) * 0.05;
                         const jitterPitch = bot.entity.pitch + (Math.random() - 0.5) * 0.05;
 
-                        // Ép luồng ghi trực tiếp gói tin vị trí đứng yên lên hệ thống network
                         bot._client.write('position_look', {
                             x: bot.entity.position.x,
                             y: bot.entity.position.y,
@@ -130,9 +126,7 @@ function createBot() {
                             pitch: jitterPitch,
                             onGround: true
                         });
-                    } catch (e) {
-                        // Tránh crash nếu thực thể chưa cập nhật tọa độ kịp
-                    }
+                    } catch (e) {}
                 }
             }, 50); 
         }
@@ -218,7 +212,6 @@ function createBot() {
         }
     });
 
-    // BẮT GÓI KICK KHI ĐÃ TRONG TRẠNG THÁI GAME CHÍNH THỨC
     bot.on('kicked', (reason) => {
         let reasonStr = '';
         try { reasonStr = JSON.stringify(reason); } 
@@ -246,7 +239,6 @@ function createBot() {
         isLoggingIn = false;
         botState = 'DISCONNECTED'; 
 
-        // DỌN SẠCH LUỒNG XOAY CHUỘT SONAR KHI VĂNG GAME
         if (sonarInterval) {
             clearInterval(sonarInterval);
             sonarInterval = null;
