@@ -62,6 +62,8 @@ function createBot() {
     });
 
     bot.on('spawn', async () => {
+        bot.physicsEnabled = true; // <--- BẬT LẠI VẬT LÝ Ở ĐÂY (để bot hoạt động bình thường khi vào server)
+
         if (!isLoggingIn) { 
             isLoggingIn = true;
             console.log('[Hub] Đã kết nối server, chuẩn bị đăng nhập...');
@@ -93,8 +95,9 @@ function createBot() {
         // BƯỚC 1: NHẬN DIỆN SONAR ĐANG QUÉT
         // ==========================================
         if (lowerMsg.includes('sonar') && lowerMsg.includes('xác minh')) {
-            console.log('>>> [Anti-Bot] Bị Sonar soi! Đứng im như tượng chờ nó cấp giấy chứng nhận...');
+            console.log('>>> [Anti-Bot] Bị Sonar soi! Đóng băng vật lý, đứng im tuyệt đối...');
             bot.clearControlStates();
+            bot.physicsEnabled = false; // <--- TẮT VẬT LÝ Ở ĐÂY (Rút ống thở để qua mặt Sonar)
             botState = 'WAIT_AUTO';
             isSonarKick = true; // Bật cờ dự phòng
         }
