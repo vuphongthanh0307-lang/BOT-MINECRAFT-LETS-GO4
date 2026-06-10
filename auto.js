@@ -23,7 +23,7 @@ console.error = function(...args) {
 
 const RECONNECT_DELAY = 300000; 
 
-const app = express();
+const app = report || express();
 const port = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot Fonggggg đang Farm VIP Pro!'));
 app.listen(port, () => console.log(`[Web] Server đang chạy trên port ${port}`));
@@ -32,7 +32,6 @@ process.on('uncaughtException', (err) => console.log('[Khiên Bất Tử] Chặn
 process.on('unhandledRejection', (err) => console.log('[Khiên Bất Tử] Lỗi Promise:', err.message));
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-const randomSleep = (min, max) => sleep(Math.floor(Math.random() * (max - min + 1) + min));
 
 // TRẠNG THÁI GỐC CỦA BOT
 let botState = 'DISCONNECTED'; 
@@ -41,7 +40,8 @@ let isLoggingIn = false;
 let isComboRunning = false; 
 let isGUIOpen = false; 
 let failCount = 0;
-let isSonarKick = false; // BẢO BỐI VƯỢT ẢI SONAR
+let isSonarKick = false; 
+let sonarInterval = null; // VŨ KHÍ BÍ MẬT: LUỒNG GÓI TIN GIẢ LẬP
 
 function createBot() {
     const bot = mineflayer.createBot({
@@ -56,14 +56,25 @@ function createBot() {
 
     currentBot = bot; 
 
+    // BẮT GÓI TIN DISCONNECT SỚM TỪ SERVER NẾU BỊ KICK TRƯỚC KHI SPAWN
+    bot.once('login', () => {
+        bot._client.on('disconnect', (packet) => {
+            try {
+                const reason = JSON.stringify(packet.reason);
+                console.log(`[Hệ Thống] Bị ngắt kết nối: ${reason}`);
+                if (reason.includes('xác minh') || reason.includes('thành công')) {
+                    isSonarKick = true;
+                }
+            } catch (e) {}
+        });
+    });
+
     bot.on('message', (jsonMsg) => {
         if (jsonMsg.toAnsi) originalLog('[Chat] ' + jsonMsg.toAnsi());
         else originalLog('[Chat] ' + jsonMsg.toString());
     });
 
     bot.on('spawn', async () => {
-        bot.physicsEnabled = true; // <--- BẬT LẠI VẬT LÝ Ở ĐÂY (để bot hoạt động bình thường khi vào server)
-
         if (!isLoggingIn) { 
             isLoggingIn = true;
             console.log('[Hub] Đã kết nối server, chuẩn bị đăng nhập...');
@@ -91,15 +102,39 @@ function createBot() {
             setTimeout(() => bot.chat('/dn Windvu@2#1#9#30849009630'), 1500); 
         }
 
-        // ==========================================
-        // BƯỚC 1: NHẬN DIỆN SONAR ĐANG QUÉT
-        // ==========================================
+        // ======================================================================
+        // BƯỚC 1: NHẬN DIỆN SONAR & BẮT ĐẦU SPAM LUỒNG PACKET GIẢ LẬP VANILLA (20Hz)
+        // ======================================================================
         if (lowerMsg.includes('sonar') && lowerMsg.includes('xác minh')) {
-            console.log('>>> [Anti-Bot] Bị Sonar soi! Đóng băng vật lý, đứng im tuyệt đối...');
+            console.log('>>> [Anti-Bot] Bị Sonar soi! Kích hoạt chế độ giả lập gói tin người thật (20Hz)...');
             bot.clearControlStates();
-            bot.physicsEnabled = false; // <--- TẮT VẬT LÝ Ở ĐÂY (Rút ống thở để qua mặt Sonar)
             botState = 'WAIT_AUTO';
-            isSonarKick = true; // Bật cờ dự phòng
+            isSonarKick = true; 
+
+            if (sonarInterval) clearInterval(sonarInterval);
+
+            // Chạy vòng lặp duy trì 50ms một gói tin (bằng tần số Game gốc)
+            sonarInterval = setInterval(() => {
+                if (botState === 'WAIT_AUTO' && bot._client && bot.entity && bot.entity.position) {
+                    try {
+                        // Giả lập người thật: Chuột nhúc nhích rung lắc siêu nhỏ (Micro-jitter)
+                        const jitterYaw = bot.entity.yaw + (Math.random() - 0.5) * 0.05;
+                        const jitterPitch = bot.entity.pitch + (Math.random() - 0.5) * 0.05;
+
+                        // Ép luồng ghi trực tiếp gói tin vị trí đứng yên lên hệ thống network
+                        bot._client.write('position_look', {
+                            x: bot.entity.position.x,
+                            y: bot.entity.position.y,
+                            z: bot.entity.position.z,
+                            yaw: jitterYaw,
+                            pitch: jitterPitch,
+                            onGround: true
+                        });
+                    } catch (e) {
+                        // Tránh crash nếu thực thể chưa cập nhật tọa độ kịp
+                    }
+                }
+            }, 50); 
         }
 
         // --- BỘ LỌC TỰ ĐỘNG JOIN PARTY ---
@@ -116,7 +151,7 @@ function createBot() {
         // ==========================================
         if (lowerMsg.includes('kicked from') || lowerMsg.includes('bảo trì') || lowerMsg.includes('đã đóng')) {
             console.log('[Hệ Thống] Bị ném ra Sảnh (Bảo trì/Kick)! Chuyển sang chế độ TỰ ĐỤC LỖ vô lại...');
-            botState = 'IN_HUB'; // Đổi thành IN_HUB để bot tự lôi la bàn ra bấm
+            botState = 'IN_HUB'; 
             isComboRunning = false; 
         }
 
@@ -151,16 +186,13 @@ function createBot() {
     // ==========================================
     setInterval(() => {
         if (!currentBot || !currentBot.inventory) return;
-        
-        // CHỈ DỪNG BẤM LA BÀN NẾU ĐANG FARM HOẶC ĐANG BỊ SONAR SOI
         if (botState === 'FARMING' || botState === 'WAIT_AUTO') return; 
 
         const items = currentBot.inventory.items();
         const hasCompass = items.some(i => i.name === 'compass');
 
         if (hasCompass) {
-            botState = 'IN_HUB'; // Luôn gán là đang ở Hub để tự bấm
-            
+            botState = 'IN_HUB'; 
             if (!isGUIOpen) {
                 console.log('[Hub] Thấy La Bàn Sảnh! Tiến hành click Menu (Tự túc)...');
                 currentBot.setQuickBarSlot(4);
@@ -186,9 +218,7 @@ function createBot() {
         }
     });
 
-    // ==========================================
-    // BƯỚC 2: ĐỌC BẢNG KICK XÁC MINH THÀNH CÔNG
-    // ==========================================
+    // BẮT GÓI KICK KHI ĐÃ TRONG TRẠNG THÁI GAME CHÍNH THỨC
     bot.on('kicked', (reason) => {
         let reasonStr = '';
         try { reasonStr = JSON.stringify(reason); } 
@@ -196,16 +226,13 @@ function createBot() {
         
         if (reasonStr.toLowerCase().includes('xác minh') || reasonStr.toLowerCase().includes('thành công') || reasonStr.toLowerCase().includes('vượt qua')) {
             console.log('>>> [Anti-Bot] Đã đọc được bảng "XÁC MINH THÀNH CÔNG" từ server!');
-            isSonarKick = true; // Khóa cờ xác nhận 100%
-        } else {
-            console.log(`[BỊ KICK] Lý do khác: ${reasonStr}`);
+            isSonarKick = true; 
         }
     });
 
     bot.on('death', () => {
         bot.clearControlStates();
         isComboRunning = false;
-
         if (botState !== 'FARMING') {
             console.log('[CẢNH BÁO] Bot chết ở Sảnh! Đang tự động ấn Hồi Sinh...');
             setTimeout(() => bot.respawn(), 2000);
@@ -219,12 +246,18 @@ function createBot() {
         isLoggingIn = false;
         botState = 'DISCONNECTED'; 
 
+        // DỌN SẠCH LUỒNG XOAY CHUỘT SONAR KHI VĂNG GAME
+        if (sonarInterval) {
+            clearInterval(sonarInterval);
+            sonarInterval = null;
+        }
+
         // ==========================================
-        // BƯỚC 3: ĐẾM NGƯỢC 12 GIÂY CHO RENDER KHỎI NGỦ + SERVER KỊP LƯU IP
+        // BƯỚC 3: ĐẾM NGƯỢC 12 GIÂY ĐỂ REJOIN
         // ==========================================
         if (isSonarKick) {
-            isSonarKick = false; // Trả lại cờ
-            failCount = 0; // Tẩy trắng rớt mạng
+            isSonarKick = false; 
+            failCount = 0; 
             console.log(`[Anti-Bot] Đang chờ 12 giây để server cập nhật danh sách...`);
             
             let waitTime = 12;
@@ -237,13 +270,13 @@ function createBot() {
                     console.log(`[Anti-Bot] Hết giờ! Phi thẳng vô cụm lượm lúa!!!`);
                     createBot();
                 }
-            }, 1000); // Lặp lại mỗi 1 giây
+            }, 1000); 
             return; 
         }
 
         failCount++;
         if (failCount >= 5) {
-            console.log(`[BÁO ĐỘNG] Rớt mạng ${failCount} lần! Ngủ đông 1 tiếng tránh bị Ban...`);
+            console.log(`[BÁO ĐỘNG] Rớt mạng ${failCount} lần! Ngủ đông một chút...`);
             failCount = 0; 
             setTimeout(createBot, 40000); 
             return;
@@ -254,7 +287,7 @@ function createBot() {
 }
 
 // ==================================================
-// KỊCH BẢN MÚA CỦA PHÁP SƯ (CHỈ SHIFT + TRÁI + PHẢI THUẦN TÚY)
+// KỊCH BẢN MÚA CỦA PHÁP SƯ
 // ==================================================
 async function startFarmingProcess(bot) {
     if (isComboRunning) return; 
@@ -267,19 +300,15 @@ async function startFarmingProcess(bot) {
         await sleep(60000);
         console.log('[Farm] Vận nội công: Đè Shift + Trái + Phải...');
         
-        // 1. ĐÈ SHIFT
         bot.setControlState('sneak', true); 
-        await sleep(500); // ⚠️ Phải đợi 0.5s để server nhận diện bot đã ngồi
+        await sleep(500); 
         
-        // 2. CLICK CHUỘT TRÁI
         bot.swingArm('right'); 
-        await sleep(400); // ⚠️ Đợi 0.4s để server chạy animation vung tay
+        await sleep(400); 
         
-        // 3. CLICK CHUỘT PHẢI (Kích hoạt skill)
         bot.activateItem(); 
-        await sleep(400); // ⚠️ Đợi 0.4s để server nổ skill
+        await sleep(400); 
         
-        // 4. NHẢ SHIFT
         bot.setControlState('sneak', false); 
         bot.clearControlStates(); 
         bot.setControlState('forward', true);
@@ -289,14 +318,11 @@ async function startFarmingProcess(bot) {
         console.log('[Farm] Đã xuất chiêu xong, chuẩn bị biến về...');
         await sleep(5000); 
 
-        // 5. BAY VỀ BÃI
         bot.chat('/home'); 
-        await sleep(6000); // Chờ 6 giây cho chắc ăn load xong map
+        await sleep(6000); 
         
-        // 6. NGỒI THIỀN
         bot.chat('/sit');
         console.log('[Farm] Đã đến bãi, nằm xuống nhập định!');
-        
         failCount = 0; 
 
     } catch (err) {
