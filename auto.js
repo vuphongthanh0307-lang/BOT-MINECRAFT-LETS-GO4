@@ -289,7 +289,7 @@ async function startFarmingProcess(bot) {
         bot.setQuickBarSlot(0); 
         await sleep(2000);
         bot.chat('/spawn');
-        await sleep(60000);
+        await sleep(120000);
         console.log('[Farm] Vận nội công: Đè Shift + Trái + Phải...');
         
         bot.setControlState('sneak', true); 
