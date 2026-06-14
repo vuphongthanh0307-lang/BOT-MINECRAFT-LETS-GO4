@@ -21,7 +21,7 @@ console.error = function(...args) {
     originalError.apply(console, args);
 };
 
-const RECONNECT_DELAY = 10000; 
+const RECONNECT_DELAY = 30000; 
 
 const app = express(); // <--- ĐÃ FIX SẠCH SẼ CHỖ NÀY CHO BRO!
 const port = process.env.PORT || 3000;
