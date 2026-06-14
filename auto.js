@@ -311,7 +311,7 @@ async function startFarmingProcess(bot) {
         await sleep(5000); 
 
         bot.chat('/home'); 
-        await sleep(6000); 
+        await sleep(2000); 
         
         bot.chat('/sit');
         console.log('[Farm] Đã đến bãi, nằm xuống nhập định!');
