@@ -98,7 +98,7 @@ function createBot() {
 
         // 1.5. LÌ LỢM ĐĂNG NHẬP
         if (lowerMsg.includes('đăng nhập bằng lệnh: /dn') || lowerMsg.includes('vui lòng đăng nhập')) {
-            setTimeout(() => bot.chat('/dn Windvu@2#1#9#30849009630'), 1500); 
+            setTimeout(() => bot.chat('/dn serverqq'), 1500); 
         }
 
         // ==========================================
