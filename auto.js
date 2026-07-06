@@ -41,7 +41,6 @@ let isComboRunning = false;
 let isGUIOpen = false; 
 let failCount = 0;
 let isSonarKick = false; 
-let sonarInterval = null; 
 
 function createBot() {
     const bot = mineflayer.createBot({
@@ -74,6 +73,7 @@ function createBot() {
     });
 
     bot.on('spawn', async () => {
+        bot.physicsEnabled = true; // Bật lại vật lý khi spawn vào bình thường
         if (!isLoggingIn) { 
             isLoggingIn = true;
             console.log('[Hub] Đã kết nối server, chuẩn bị đăng nhập...');
@@ -102,14 +102,14 @@ function createBot() {
         }
 
         // ==========================================
-        // BƯỚC 1: NHẬN DIỆN SONAR ĐANG QUÉT (ĐÃ FIX LỖI RUNG LẮC)
+        // BƯỚC 1: NHẬN DIỆN SONAR ĐANG QUÉT (NÂNG CẤP TẮT VẬT LÝ)
         // ==========================================
         if (lowerMsg.includes('sonar') && lowerMsg.includes('xác minh')) {
-            console.log('>>> [Anti-Bot] Bị Sonar soi! Đứng im như tượng đá, cấm nhúc nhích...');
+            console.log('>>> [Anti-Bot] Bị Sonar soi! TẮT TOÀN BỘ VẬT LÝ, HÓA THÀNH TƯỢNG ĐÁ ĐỂ QUA ẢI...');
             bot.clearControlStates();
+            bot.physicsEnabled = false; // Rút phích cắm vật lý, bot sẽ hoàn toàn đóng băng không gửi gói tin vị trí
             botState = 'WAIT_AUTO';
             isSonarKick = true; 
-            // Không gửi gói tin rung lắc (jitter) nữa để pass Sonar an toàn.
         }
 
         // --- BỘ LỌC TỰ ĐỘNG JOIN PARTY ---
@@ -150,6 +150,7 @@ function createBot() {
         
         if (botState !== 'FARMING' && (hasJoinMessage || hasGameMessage)) {
             console.log(`[Mắt Thần] Thấy thông báo vô game! ĐÃ LỌT VÀO CỤM FARM AN TOÀN! Khóa Hub, Bắt đầu múa!`);
+            bot.physicsEnabled = true; // Chắc chắn bật lại vật lý khi bắt đầu farm
             botState = 'FARMING';
             isComboRunning = false; 
             startFarmingProcess(bot);
@@ -220,20 +221,15 @@ function createBot() {
         isLoggingIn = false;
         botState = 'DISCONNECTED'; 
 
-        if (sonarInterval) {
-            clearInterval(sonarInterval);
-            sonarInterval = null;
-        }
-
         // ==========================================
-        // BƯỚC 3: ĐẾM NGƯỢC 12 GIÂY ĐỂ REJOIN
+        // BƯỚC 3: ĐẾM NGƯỢC 25 GIÂY ĐỂ REJOIN CHO SERVER KỊP CẬP NHẬT DATABASE
         // ==========================================
         if (isSonarKick) {
             isSonarKick = false; 
             failCount = 0; 
-            console.log(`[Anti-Bot] Đang chờ 12 giây để server cập nhật danh sách...`);
+            console.log(`[Anti-Bot] Đang chờ 25 giây để server cập nhật danh sách (Đợi cho chắc ăn)...`);
             
-            let waitTime = 12;
+            let waitTime = 25;
             const countdownInterval = setInterval(() => {
                 console.log(`... Đang đếm ngược: ${waitTime} giây nữa sẽ vô lại ...`);
                 waitTime--;
