@@ -21,9 +21,9 @@ console.error = function(...args) {
     originalError.apply(console, args);
 };
 
-const RECONNECT_DELAY = 30000; 
+const RECONNECT_DELAY = 40000; 
 
-const app = express(); // <--- ĐÃ FIX SẠCH SẼ CHỖ NÀY CHO BRO!
+const app = express();
 const port = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('Bot Fonggggg đang Farm VIP Pro!'));
 app.listen(port, () => console.log(`[Web] Server đang chạy trên port ${port}`));
@@ -102,33 +102,14 @@ function createBot() {
         }
 
         // ==========================================
-        // BƯỚC 1: NHẬN DIỆN SONAR ĐANG QUÉT
+        // BƯỚC 1: NHẬN DIỆN SONAR ĐANG QUÉT (ĐÃ FIX LỖI RUNG LẮC)
         // ==========================================
         if (lowerMsg.includes('sonar') && lowerMsg.includes('xác minh')) {
-            console.log('>>> [Anti-Bot] Bị Sonar soi! Kích hoạt chế độ giả lập gói tin người thật (20Hz)...');
+            console.log('>>> [Anti-Bot] Bị Sonar soi! Đứng im như tượng đá, cấm nhúc nhích...');
             bot.clearControlStates();
             botState = 'WAIT_AUTO';
             isSonarKick = true; 
-
-            if (sonarInterval) clearInterval(sonarInterval);
-
-            sonarInterval = setInterval(() => {
-                if (botState === 'WAIT_AUTO' && bot._client && bot.entity && bot.entity.position) {
-                    try {
-                        const jitterYaw = bot.entity.yaw + (Math.random() - 0.5) * 0.05;
-                        const jitterPitch = bot.entity.pitch + (Math.random() - 0.5) * 0.05;
-
-                        bot._client.write('position_look', {
-                            x: bot.entity.position.x,
-                            y: bot.entity.position.y,
-                            z: bot.entity.position.z,
-                            yaw: jitterYaw,
-                            pitch: jitterPitch,
-                            onGround: true
-                        });
-                    } catch (e) {}
-                }
-            }, 50); 
+            // Không gửi gói tin rung lắc (jitter) nữa để pass Sonar an toàn.
         }
 
         // --- BỘ LỌC TỰ ĐỘNG JOIN PARTY ---
