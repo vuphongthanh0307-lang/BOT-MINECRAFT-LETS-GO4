@@ -282,7 +282,7 @@ async function startFarmingProcess(bot) {
         await sleep(10000);
         
         bot.setControlState('sneak', true); 
-        await sleep(7000); 
+        await sleep(3000); 
         
         bot.swingArm('right'); 
         await sleep(700);
